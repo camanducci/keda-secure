@@ -24,7 +24,71 @@ Imagens reconstruídas com Go 1.25.6 e dependências atualizadas:
 
 ---
 
-## Passo a Passo
+## CI/CD Pipeline
+
+Este repositório utiliza GitHub Actions para automatizar o processo de build, scan e deploy das imagens.
+
+### Pipeline Overview
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         Pipeline                                 │
+├─────────────────────────────────────────────────────────────────┤
+│  1. scan-dependencies     → govulncheck nas dependências Go     │
+│           ↓                                                      │
+│  2. build-and-scan        → Build + Trivy + Grype (3 imagens)   │
+│           ↓                                                      │
+│  3. push-images           → Push para Docker Hub (só em main)   │
+│           ↓                                                      │
+│  4. security-report       → Gera resumo no GitHub Summary       │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Etapas do Pipeline
+
+| Etapa | Descrição | Ferramentas |
+|-------|-----------|-------------|
+| **scan-dependencies** | Analisa vulnerabilidades nas dependências Go | govulncheck |
+| **build-and-scan** | Constrói as 3 imagens e escaneia cada uma | Docker, Trivy, Grype |
+| **push-images** | Publica imagens no Docker Hub (apenas branch main) | Docker Hub |
+| **security-report** | Gera relatório de segurança no GitHub Summary | GitHub Actions |
+
+### Configurar Secrets
+
+Para o pipeline funcionar, configure os secrets no GitHub:
+
+1. Acesse: `Settings → Secrets and variables → Actions`
+2. Adicione os seguintes secrets:
+
+| Secret | Descrição |
+|--------|-----------|
+| `DOCKERHUB_USERNAME` | Seu usuário do Docker Hub |
+| `DOCKERHUB_TOKEN` | Token de acesso do Docker Hub |
+
+### Criar Token no Docker Hub
+
+1. Acesse: https://hub.docker.com/settings/security
+2. Clique em **New Access Token**
+3. Nome: `github-actions`
+4. Permissões: **Read & Write**
+5. Copie o token e adicione no GitHub Secrets
+
+### Executar Pipeline
+
+O pipeline é executado automaticamente em:
+- ✅ Push na branch `main`
+- ✅ Pull Requests para `main`
+- ✅ Manualmente via **Actions → Run workflow**
+
+### Política de Segurança
+
+O pipeline **falha automaticamente** se encontrar:
+- Vulnerabilidades **HIGH** ou **CRITICAL** nas imagens
+- Vulnerabilidades nas dependências Go
+
+---
+
+## Passo a Passo (Manual)
 
 ### 1. Escanear Vulnerabilidades
 
