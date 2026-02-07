@@ -16,8 +16,8 @@ jobs:
     name: Scan Go Dependencies
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Clone KEDA source from fork
+        run: git clone --depth 1 https://github.com/camanducci/keda.git keda-source
 
       - name: Setup Go
         uses: actions/setup-go@v5
@@ -28,6 +28,7 @@ jobs:
         run: go install golang.org/x/vuln/cmd/govulncheck@latest
 
       - name: Run govulncheck
+        working-directory: keda-source
         run: govulncheck ./...
 
   build-and-scan:
@@ -44,8 +45,8 @@ jobs:
           - image: keda-admission-webhooks
             dockerfile: Dockerfile.webhooks
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Clone KEDA source from fork
+        run: git clone --depth 1 https://github.com/camanducci/keda.git .
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -110,8 +111,8 @@ jobs:
           - image: keda-admission-webhooks
             dockerfile: Dockerfile.webhooks
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Clone KEDA source from fork
+        run: git clone --depth 1 https://github.com/camanducci/keda.git .
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
