@@ -150,6 +150,7 @@ jobs:
     steps:
       - name: Download all scan results
         uses: actions/download-artifact@v4
+        continue-on-error: true
         with:
           path: all-scan-results
 
@@ -157,18 +158,26 @@ jobs:
         run: |
           echo "## Security Scan Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ ! -d "all-scan-results" ] || [ -z "$(ls -A all-scan-results 2>/dev/null)" ]; then
+            echo "⚠️ No scan results available. Build may have failed." >> $GITHUB_STEP_SUMMARY
+            exit 0
+          fi
+
           echo "| Image | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
 
           for dir in all-scan-results/*/; do
-            image=$(basename "$dir" | sed 's/scan-results-//')
-            if [ -f "$dir"/*-trivy.json ]; then
-              high=$(cat "$dir"/*-trivy.json | jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")] | length')
-              critical=$(cat "$dir"/*-trivy.json | jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length')
-              if [ "$high" -eq 0 ] && [ "$critical" -eq 0 ]; then
-                echo "| $image | ✅ Secure (0 HIGH, 0 CRITICAL) |" >> $GITHUB_STEP_SUMMARY
-              else
-                echo "| $image | ❌ Vulnerabilities ($high HIGH, $critical CRITICAL) |" >> $GITHUB_STEP_SUMMARY
+            if [ -d "$dir" ]; then
+              image=$(basename "$dir" | sed 's/scan-results-//')
+              if [ -f "$dir"/*-trivy.json ]; then
+                high=$(cat "$dir"/*-trivy.json | jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")] | length')
+                critical=$(cat "$dir"/*-trivy.json | jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length')
+                if [ "$high" -eq 0 ] && [ "$critical" -eq 0 ]; then
+                  echo "| $image | ✅ Secure (0 HIGH, 0 CRITICAL) |" >> $GITHUB_STEP_SUMMARY
+                else
+                  echo "| $image | ❌ Vulnerabilities ($high HIGH, $critical CRITICAL) |" >> $GITHUB_STEP_SUMMARY
+                fi
               fi
             fi
           done
