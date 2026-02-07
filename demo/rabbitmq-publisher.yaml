@@ -1,0 +1,37 @@
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: rabbitmq-publisher
+  namespace: rabbitmq-demo
+spec:
+  restartPolicy: Never
+  containers:
+  - name: publisher
+    image: python:3.9-slim
+    command:
+    - /bin/bash
+    - -c
+    - |
+      pip install pika -q
+      python << 'EOF'
+      import pika
+      import time
+
+      # Conectar ao RabbitMQ
+      connection = pika.BlockingConnection(
+          pika.ConnectionParameters(host='rabbitmq.rabbitmq-demo.svc.cluster.local')
+      )
+      channel = connection.channel()
+
+      # Criar a fila
+      channel.queue_declare(queue='hello')
+
+      # Publicar 50 mensagens
+      for i in range(50):
+          channel.basic_publish(exchange='', routing_key='hello', body=f'Message {i}')
+          print(f'Sent message {i}')
+
+      print('Done! Published 50 messages')
+      connection.close()
+      EOF

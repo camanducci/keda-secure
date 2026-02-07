@@ -1,0 +1,58 @@
+---
+# ServiceMonitor para KEDA Operator
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: keda-operator
+  namespace: monitoring
+  labels:
+    release: prometheus
+spec:
+  namespaceSelector:
+    matchNames:
+    - keda
+  selector:
+    matchLabels:
+      app: keda-operator
+  endpoints:
+  - port: http
+    interval: 15s
+---
+# ServiceMonitor para KEDA Metrics Server
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: keda-metrics-apiserver
+  namespace: monitoring
+  labels:
+    release: prometheus
+spec:
+  namespaceSelector:
+    matchNames:
+    - keda
+  selector:
+    matchLabels:
+      app: keda-metrics-apiserver
+  endpoints:
+  - port: http
+    interval: 15s
+---
+# PodMonitor para RabbitMQ
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: rabbitmq
+  namespace: monitoring
+  labels:
+    release: prometheus
+spec:
+  namespaceSelector:
+    matchNames:
+    - rabbitmq-demo
+  selector:
+    matchLabels:
+      app: rabbitmq
+  podMetricsEndpoints:
+  - port: management
+    path: /metrics
+    interval: 15s

@@ -1,0 +1,52 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rabbitmq-consumer
+  namespace: rabbitmq-demo
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
+      app: rabbitmq-consumer
+  template:
+    metadata:
+      labels:
+        app: rabbitmq-consumer
+    spec:
+      containers:
+      - name: consumer
+        image: python:3.9-slim
+        command:
+        - /bin/bash
+        - -c
+        - |
+          pip install pika -q
+          python << 'EOF'
+          import pika
+          import time
+          import os
+
+          print("Consumer starting...")
+
+          while True:
+              try:
+                  connection = pika.BlockingConnection(
+                      pika.ConnectionParameters(host='rabbitmq.rabbitmq-demo.svc.cluster.local')
+                  )
+                  channel = connection.channel()
+                  channel.queue_declare(queue='hello')
+
+                  def callback(ch, method, properties, body):
+                      print(f"Received: {body.decode()}")
+                      time.sleep(2)  # Simula processamento
+                      ch.basic_ack(delivery_tag=method.delivery_tag)
+
+                  channel.basic_qos(prefetch_count=1)
+                  channel.basic_consume(queue='hello', on_message_callback=callback)
+                  print("Waiting for messages...")
+                  channel.start_consuming()
+              except Exception as e:
+                  print(f"Error: {e}, retrying in 5s...")
+                  time.sleep(5)
+          EOF

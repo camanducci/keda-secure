@@ -1,0 +1,116 @@
+---
+# RabbitMQ Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rabbitmq
+  namespace: rabbitmq-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rabbitmq
+  template:
+    metadata:
+      labels:
+        app: rabbitmq
+    spec:
+      containers:
+      - name: rabbitmq
+        image: rabbitmq:3-management
+        ports:
+        - containerPort: 5672
+          name: amqp
+        - containerPort: 15672
+          name: management
+        env:
+        - name: RABBITMQ_DEFAULT_USER
+          value: "guest"
+        - name: RABBITMQ_DEFAULT_PASS
+          value: "guest"
+---
+# RabbitMQ Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq
+  namespace: rabbitmq-demo
+spec:
+  selector:
+    app: rabbitmq
+  ports:
+  - port: 5672
+    targetPort: 5672
+    name: amqp
+  - port: 15672
+    targetPort: 15672
+    name: management
+---
+# Consumer Deployment (será escalado pelo KEDA)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rabbitmq-consumer
+  namespace: rabbitmq-demo
+spec:
+  replicas: 0  # Começa com 0, KEDA vai escalar
+  selector:
+    matchLabels:
+      app: rabbitmq-consumer
+  template:
+    metadata:
+      labels:
+        app: rabbitmq-consumer
+    spec:
+      containers:
+      - name: consumer
+        image: ghcr.io/kedacore/tests-rabbitmq:latest
+        env:
+        - name: RABBITMQ_HOST
+          value: "amqp://guest:guest@rabbitmq.rabbitmq-demo.svc.cluster.local:5672/"
+        - name: RABBITMQ_QUEUE
+          value: "hello"
+---
+# TriggerAuthentication para RabbitMQ
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: rabbitmq-trigger-auth
+  namespace: rabbitmq-demo
+spec:
+  secretTargetRef:
+  - parameter: host
+    name: rabbitmq-secret
+    key: host
+---
+# Secret com credenciais do RabbitMQ
+apiVersion: v1
+kind: Secret
+metadata:
+  name: rabbitmq-secret
+  namespace: rabbitmq-demo
+type: Opaque
+stringData:
+  host: "amqp://guest:guest@rabbitmq.rabbitmq-demo.svc.cluster.local:5672/"
+---
+# ScaledObject - Configura o KEDA para escalar baseado na fila
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: rabbitmq-scaledobject
+  namespace: rabbitmq-demo
+spec:
+  scaleTargetRef:
+    name: rabbitmq-consumer
+  minReplicaCount: 0   # Escala para zero quando não há mensagens
+  maxReplicaCount: 10  # Máximo de 10 réplicas
+  pollingInterval: 5   # Verifica a cada 5 segundos
+  cooldownPeriod: 30   # Espera 30s antes de escalar para baixo
+  triggers:
+  - type: rabbitmq
+    metadata:
+      queueName: hello
+      mode: QueueLength
+      value: "5"  # Escala 1 pod para cada 5 mensagens na fila
+    authenticationRef:
+      name: rabbitmq-trigger-auth
